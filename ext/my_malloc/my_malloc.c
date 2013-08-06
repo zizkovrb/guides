@@ -1,9 +1,21 @@
 #include <ruby.h>
 
+/*
+ * This structure holds the size of the pointer (to make cleanup easier) and
+ * the pointer to the allocated memory.  Data_Make_Struct() and
+ * Data_Get_Struct will extract this structure from the wrapped object so you
+ * can work with the pointer.
+ */
+
 struct my_malloc {
     size_t size;
     void *ptr;
 };
+
+/*
+ * This frees the internal pointer at garbage-collection time.  Ruby will free
+ * the struct my_malloc for us.
+ */
 
 static void
 my_malloc_free(void *p) {
@@ -13,10 +25,18 @@ my_malloc_free(void *p) {
 	free(ptr->ptr);
 }
 
+/*
+ * This allocates the object and default values for the struct my_malloc.
+ */
+
 static VALUE
 my_malloc_alloc(VALUE klass) {
     VALUE obj;
     struct my_malloc *ptr;
+
+    /* there is no mark function as struct my_malloc does not store ruby
+     * objects
+     */
 
     obj = Data_Make_Struct(klass, struct my_malloc, NULL, my_malloc_free, ptr);
 
@@ -25,6 +45,12 @@ my_malloc_alloc(VALUE klass) {
 
     return obj;
 }
+
+/*
+ * This is #initialize which allocates some memory and stores the pointer in
+ * struct my_malloc.  (There's not anything useful you can do with the memory,
+ * though.)
+ */
 
 static VALUE
 my_malloc_init(VALUE self, VALUE size) {
@@ -46,6 +72,12 @@ my_malloc_init(VALUE self, VALUE size) {
     return self;
 }
 
+/*
+ * This frees the internal pointer so you can explicitly control the lifetime
+ * of the held memory (instead of waiting for GC).  If you don't free the
+ * memory the GC will do it for us.
+ */
+
 static VALUE
 my_malloc_release(VALUE self) {
     struct my_malloc *ptr;
@@ -60,6 +92,14 @@ my_malloc_release(VALUE self) {
 
     return self;
 }
+
+/*
+ * This defines the C functions as extensions.
+ *
+ * The name of the Init_ function is important.  What follows Init_ must match
+ * the file name (including case) so ruby knows what method to call to define
+ * the extensions.
+ */
 
 void
 Init_my_malloc(void) {
